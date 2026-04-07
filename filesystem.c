@@ -1,5 +1,6 @@
 #include <string.h>
 #include "disk.h"
+#include <stdio.h>
 
 #define FAT_SIZE 4096
 #define FAT_FREE -2
@@ -11,7 +12,8 @@ typedef struct {
     int size; //size of file
 } dirfile;
 
-short fat[FAT_SIZE]; //fat array from disk
+static short fat[FAT_SIZE]; //fat array from disk
+dirfile root[64]; //creates struct for each root dor file
 
 int make_fs(char *disk_name) {
     char buffer[BLOCK_SIZE];
@@ -55,6 +57,45 @@ int make_fs(char *disk_name) {
     return 0;
 }
 
+int mount_fs(char *disk_name) {
+    char buffer[BLOCK_SIZE];
+
+    if (open_disk(disk_name) < 0) {
+        return -1;
+    }
+
+    //loads fat to to buffer
+    block_read(1, buffer);
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        ((char*)fat)[i] = buffer[i];
+    }
+
+    block_read(2, buffer); //reads second block and coppes into second half of fat
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        ((char*)fat + BLOCK_SIZE)[i] = buffer[i];
+    }
+    
+    block_read(3, buffer);
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        //copies byetes to root
+        ((char*)root)[i] = buffer[i];
+    }
+
+    return 0;
+}
+
+
 int main() {
+
+    if (make_fs("mydisk") < 0) {
+        printf("makefs fail\n");
+        return -1;
+    }
+    
+    if (mount_fs("mydisk") < 0) {
+        printf("mountfs fail\n");
+        return -1;
+    }
+    printf("sucess");
     return 0;
 }
