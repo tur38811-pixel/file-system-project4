@@ -84,6 +84,34 @@ int mount_fs(char *disk_name) {
     return 0;
 }
 
+int umount_fs(char *disk_name) {
+    char buffer[BLOCK_SIZE];
+
+    //loads biffer to first block
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        buffer[i] = ((char*)fat)[i];
+    }
+    block_write(1, buffer);
+
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        buffer[i] = ((char*)fat + BLOCK_SIZE)[i];
+    }
+    block_write(2, buffer); 
+
+    
+    for (int i = 0; i < BLOCK_SIZE; i++) {
+        //copies root back to third block
+         buffer[i] = ((char*)root)[i];
+    }
+    block_write(3, buffer);
+
+    if (close_disk() < 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
 
 int main() {
 
@@ -94,6 +122,10 @@ int main() {
     
     if (mount_fs("mydisk") < 0) {
         printf("mountfs fail\n");
+        return -1;
+    }
+    if (umount_fs("mydisk") < 0) {
+        printf("umountfs fail\n");
         return -1;
     }
     printf("sucess");
