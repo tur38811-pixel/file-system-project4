@@ -4,6 +4,8 @@
 
 #define FAT_SIZE 4096
 #define FAT_FREE -2
+#define MAX_FD 32
+#define MAX_FILES 64
 
 //strcut for root directory files to write to
 typedef struct {
@@ -12,8 +14,16 @@ typedef struct {
     int size; //size of file
 } dirfile;
 
+typedef struct {
+    int filled; //keeps track if slot is taken
+    int root_idx;//keeps track of where the file is in the root directoru
+    int current; // keeps trackof files current position in file
+} fdesc;
+
+fdesc fd_table[MAX_FD]; //creates teh file descripter with max 32
+
 static short fat[FAT_SIZE]; //fat array from disk
-dirfile root[64]; //creates struct for each root dor file
+dirfile root[MAX_FILES]; //creates struct for each root dor file
 
 int make_fs(char *disk_name) {
     char buffer[BLOCK_SIZE];
@@ -60,6 +70,10 @@ int make_fs(char *disk_name) {
 int mount_fs(char *disk_name) {
     char buffer[BLOCK_SIZE];
 
+    for (int i = 0; i < MAX_FD; i++) {
+        fd_table[i].filled = 0; //clears the fd table with every mount
+    }
+
     if (open_disk(disk_name) < 0) {
         return -1;
     }
@@ -87,6 +101,10 @@ int mount_fs(char *disk_name) {
 int umount_fs(char *disk_name) {
     char buffer[BLOCK_SIZE];
 
+    for (int i = 0; i < MAX_FD; i++) {
+        fd_table[i].filled = 0; //clears the fd table with every umount
+    }
+
     //loads biffer to first block
     for (int i = 0; i < BLOCK_SIZE; i++) {
         buffer[i] = ((char*)fat)[i];
@@ -112,6 +130,40 @@ int umount_fs(char *disk_name) {
     return 0;
 }
 
+int fs_open(char *name) {
+
+    //iterates through root directoyu tp find file
+    int root_idx = 0;
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (strcmp(root[i].name[0], name) && root[i].name[0] != '\0') {
+            root_idx = i;
+            break;
+        }
+    }
+    //If file not found
+    if (root_idx == 0) {
+        return -1;
+    }
+
+    // find an empry slot in fd table
+    int fd = -1;
+    for (int i = 0; i < MAX_FD; i++) {
+        if (fd_table[i].filled == 0) {
+            fd = i;
+            break;
+        }
+    }
+    if (fd == -1) {
+        return -1;
+    }
+
+    //fill in the fd table entry
+    fd_table[fd].filled = 1;
+    fd_table[fd]. root_idx  = root_idx;
+    fd_table[fd].current = 0;
+
+    return fd;
+}
 
 int main() {
 
