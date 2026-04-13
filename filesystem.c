@@ -159,27 +159,50 @@ int fs_open(char *name) {
 
     //fill in the fd table entry
     fd_table[fd].filled = 1;
-    fd_table[fd]. root_idx  = root_idx;
+    fd_table[fd].root_idx  = root_idx;
     fd_table[fd].current = 0;
 
     return fd;
 }
 
+int fs_close(int fd) {
+    if (fd < 0 || fd >= MAX_FD || fd_table[fd].filled == 0) {
+        return -1;
+    }
+    fd_table[fd].filled = 0; //marks the slot as empty
+    return 0;
+}
+
+int fs_create(char *name) {
+    //check if the file already exists
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (strcmp(root[i].name[0], name) && root[i].name[0] != '\0') {
+            return -1;
+        }
+    }
+
+    //find an empty spot in root directory
+    int root_idx = -1;
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (root[i].name[0] == '\0') { //checks if the name is empy
+            root_idx = i; // root isx saves empty spot
+            break;
+        }
+    }
+    if (root_idx == -1) {
+        return -1; //if root idx stays -1 no empty in root
+    }
+
+    //create the file in the root directory
+    strncpy(root[root_idx].name, name, 16); //copes name to new file
+    root[root_idx].first_block_idx = FAT_FREE; //no blocs allocated yet
+    root[root_idx].size = 0; ///file starts as empty
+
+    return 0;
+}
+
+
 int main() {
 
-    if (make_fs("mydisk") < 0) {
-        printf("makefs fail\n");
-        return -1;
-    }
-    
-    if (mount_fs("mydisk") < 0) {
-        printf("mountfs fail\n");
-        return -1;
-    }
-    if (umount_fs("mydisk") < 0) {
-        printf("umountfs fail\n");
-        return -1;
-    }
-    printf("sucess");
     return 0;
 }
