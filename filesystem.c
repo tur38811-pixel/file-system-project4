@@ -176,7 +176,7 @@ int fs_close(int fd) {
 int fs_create(char *name) {
     //check if the file already exists
     for (int i = 0; i < MAX_FILES; i++) {
-        if (strcmp(root[i].name[0], name) && root[i].name[0] != '\0') {
+        if (strcmp(root[i].name[0], name) == 0 && root[i].name[0] != '\0') {
             return -1;
         }
     }
@@ -188,6 +188,7 @@ int fs_create(char *name) {
             root_idx = i; // root isx saves empty spot
             break;
         }
+        
     }
     if (root_idx == -1) {
         return -1; //if root idx stays -1 no empty in root
@@ -197,6 +198,48 @@ int fs_create(char *name) {
     strncpy(root[root_idx].name, name, 16); //copes name to new file
     root[root_idx].first_block_idx = FAT_FREE; //no blocs allocated yet
     root[root_idx].size = 0; ///file starts as empty
+
+    return 0;
+}
+
+int fs_delete(char *name) {
+    //find the file in the root directory
+    int root_idx = -1;
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (strcmp(root[i].name[0], name) == 0 && root[i].name[0] != '\0') {
+            root_idx = i;
+            break;
+        }
+    }
+    if (root_idx == -1) {
+        return -1; //file not found
+    }
+
+    for (int i = 0; i < MAX_FD; i++) {
+        if (fd_table[i].filled == 1 && fd_table[i].root_idx == root_idx) { // if the slot is filled and if root isx is the current idx
+            return -1; //file is alrady open
+        
+        }
+    }
+
+
+    //free the blocks allocated to the file in fat
+    int block_idx = root[root_idx].first_block_idx;
+
+    while (block_idx != -1) {
+        int next_block_idx = fat[block_idx]; //get next block index from FAT
+        fat[block_idx] = FAT_FREE; //mark  block as free
+        block_idx = next_block_idx; 
+    }
+
+    //remove the file from the root directory
+    for (int i = 0; i < 16; i++) {
+        root[root_idx].name[i] = '\0'; //clears the name
+    }
+
+    root[root_idx].first_block_idx = FAT_FREE; //reset first block index
+    root[root_idx].size = 0; //reset size
+
 
     return 0;
 }
