@@ -135,7 +135,7 @@ int fs_open(char *name) {
     //iterates through root directoyu tp find file
     int root_idx = 0;
     for (int i = 0; i < MAX_FILES; i++) {
-        if (strcmp(root[i].name[0], name) && root[i].name[0] != '\0') {
+        if (strcmp(root[i].name, name) == 0 && root[i].name[0] != '\0') {
             root_idx = i;
             break;
         }
@@ -176,7 +176,7 @@ int fs_close(int fd) {
 int fs_create(char *name) {
     //check if the file already exists
     for (int i = 0; i < MAX_FILES; i++) {
-        if (strcmp(root[i].name[0], name) == 0 && root[i].name[0] != '\0') {
+        if (strcmp(root[i].name, name) == 0 && root[i].name[0] != '\0') {
             return -1;
         }
     }
@@ -206,7 +206,7 @@ int fs_delete(char *name) {
     //find the file in the root directory
     int root_idx = -1;
     for (int i = 0; i < MAX_FILES; i++) {
-        if (strcmp(root[i].name[0], name) == 0 && root[i].name[0] != '\0') {
+        if (strcmp(root[i].name, name) == 0 && root[i].name[0] != '\0') {
             root_idx = i;
             break;
         }
@@ -244,8 +244,58 @@ int fs_delete(char *name) {
     return 0;
 }
 
+int fs_read(int fd, void *buf, size_t count) {
+    //check if fd is valid
+    if (fd < 0 || fd >= MAX_FD || fd_table[fd].filled == 0) {
+        return -1;
+    }
+
+    int root_idx = fd_table[fd].root_idx; //root index from fd table
+    int file_size = root[root_idx].size; //get file size from rot directory
+
+    if (count > file_size - fd_table[fd].current) { //adjust count if it exceeds file size
+        count = file_size - fd_table[fd].current;
+    }
+
+    int bytes_read = 0;
+    int block_idx = root[root_idx].first_block_idx; //get first block index from root directory
+
+    //navigate to the current position in the file
+    int current_pos = fd_table[fd].current;
+    while (current_pos >= BLOCK_SIZE && block_idx != FAT_FREE) {
+        block_idx = fat[block_idx]; //move to next block
+        current_pos -= BLOCK_SIZE; 
+    }
+
+    while (bytes_read < count && block_idx != FAT_FREE) {
+        char block_buffer[BLOCK_SIZE];
+        block_read(block_idx, block_buffer); //read the current block into buffer
+
+        int bytes_to_copy = BLOCK_SIZE - current_pos; //calculate how many bytes to copy from the current block
+        if (bytes_to_copy > count - bytes_read) {
+            bytes_to_copy = count - bytes_read; //adjust bytes to copy if it exceeds remaining count
+        }
+
+
+        for (int i = 0; i < bytes_to_copy; i++) {
+            ((char*)buf)[bytes_read + i] = block_buffer[current_pos + i]; //copy bytes userbuffer
+        }
+
+        bytes_read += bytes_to_copy; //update bytes reas
+        current_pos = 0; 
+        block_idx = fat[block_idx]; //move to next block
+    }
+
+    fd_table[fd].current += bytes_read; //update current position in fd table
+
+    return bytes_read;
+}
+
 
 int main() {
 
     return 0;
 }
+
+
+
