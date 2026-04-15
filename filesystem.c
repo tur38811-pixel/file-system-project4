@@ -1,6 +1,7 @@
 #include <string.h>
 #include "disk.h"
 #include <stdio.h>
+#include <sys/types.h>
 
 #define FAT_SIZE 4096
 #define FAT_FREE -2
@@ -133,7 +134,7 @@ int umount_fs(char *disk_name) {
 int fs_open(char *name) {
 
     //iterates through root directoyu tp find file
-    int root_idx = 0;
+    int root_idx = -1;
     for (int i = 0; i < MAX_FILES; i++) {
         if (strcmp(root[i].name, name) == 0 && root[i].name[0] != '\0') {
             root_idx = i;
@@ -141,7 +142,7 @@ int fs_open(char *name) {
         }
     }
     //If file not found
-    if (root_idx == 0) {
+    if (root_idx == -1) {
         return -1;
     }
 
@@ -292,6 +293,7 @@ int fs_read(int fildes, void *buf, size_t nbyte) {
 }
 
 int fs_write(int fildes, void *buf, size_t nbyte) {
+
     //checkss if fd is valid
     if (fildes < 0 || fildes >= MAX_FD || fd_table[fildes].filled == 0) {
         return -1;
@@ -300,13 +302,14 @@ int fs_write(int fildes, void *buf, size_t nbyte) {
 
     int root_idx = fd_table[fildes].root_idx; //get root idx from fd table
 
-    int block_idx = root[root_idx].first_block_idx; //get first block index from root directory
+    int block_idx = root[root_idx].first_block_idx; //get first block idx from root directory
 
     //urrent pos in the file
     int current_pos = fd_table[fildes].current;
     int prev = -1;
 
-    while (current_pos >= BLOCK_SIZE) {
+    
+    while (current_pos >= BLOCK_SIZE) { //if u sre past first blocl
 
         if (block_idx == FAT_FREE) { //if we need to allocate a new block
             block_idx = -1;
@@ -332,11 +335,14 @@ int fs_write(int fildes, void *buf, size_t nbyte) {
         }
         block_idx = fat[block_idx]; //move to next block
         current_pos -= BLOCK_SIZE; 
+
     }
 
 
+    //keep writing unti run out of blocks
     while (bytes_written < nbyte) {
-        if (block_idx == FAT_FREE) { //if we need to allocate a new block
+        //continues to write
+        if (block_idx == FAT_FREE) { // id u find free 
             block_idx = -1;
             //allocate new block and get its index
             for (int i = 0; i < FAT_SIZE; i++) {
@@ -383,9 +389,112 @@ int fs_write(int fildes, void *buf, size_t nbyte) {
     return bytes_written;
 }
 
+int fs_lseek(int fildes, off_t offset) {
+    //check if fd is valid
+    if (fildes < 0 || fildes >= MAX_FD || fd_table[fildes].filled == 0) {
+        return -1;
+    }
+
+    int root_idx = fd_table[fildes].root_idx; //get root idx from fd table
+    int file_size = root[root_idx].size; //get file size from root directory
+
+    if (offset < 0 || offset > file_size) {
+        return -1; // offset past end
+    }
+
+    fd_table[fildes].current = offset; //update pos in fd 
+
+    return 0;
+}
+
+int fs_truncate(int fildes, off_t length) {
+    //check if fd is valid
+    if (fildes < 0 || fildes >= MAX_FD || fd_table[fildes].filled == 0) {
+        return -1;
+    }
+
+    int root_idx = fd_table[fildes].root_idx;
+     //get root idx from fd table
+    int file_size = root[root_idx].size; //get file size from root directory
+
+    if (length < 0 || length > file_size) {
+        return -1; //length past end of file
+    }
+
+    int block_idx = root[root_idx].first_block_idx; //get first block idx from root directory
+    int prev_block_idx = -1;
+    int current_pos = 0;
+
+    // go to the block where truncation happen
+    while (current_pos < length && block_idx != FAT_FREE) { 
+        prev_block_idx = block_idx;
+
+        block_idx = fat[block_idx];
+        current_pos += BLOCK_SIZE;
+    }
+
+    if (prev_block_idx != -1) {
+        fat[prev_block_idx] = -1; //mark the last block as eof
+    } else {
+        root[root_idx].first_block_idx = FAT_FREE; //if truncating to zero, mark first block as free in root directory
+    }
+    //fees remainign blocks
+    while (block_idx != FAT_FREE && block_idx != -1) { 
+        int next_block_idx = fat[block_idx];
+        fat[block_idx] = FAT_FREE; //mark block as free
+        block_idx = next_block_idx;
+    }
+
+    for (int i = 0; i < MAX_FD; i++) {
+        //if fd is past truncated part then moce it back
+        if (fd_table[i].filled == 1 && fd_table[i].root_idx == root_idx) { //update pos
+            if (fd_table[i].current > length) {
+                fd_table[i].current = length;
+            }
+        }
+    }
+
+    root[root_idx].size = length; //update file size in root directory
+
+    return 0;
+}
+
+int fs_get_filesize(int fildes) {
+    
+    if (fildes < 0 || fildes >= MAX_FD || fd_table[fildes].filled == 0) {
+        return -1;
+    }
+
+    int root_idx = fd_table[fildes].root_idx; //get root idx from fd table
+    return root[root_idx].size; 
+    //return file size from root directory
+}
+
 
 
 int main() {
+    
+    
+    make_fs("mydisk");
+    mount_fs("mydisk");
+
+    int fd2 = fs_open("nonexistent.txt");
+    char read_buf[20];
+    fs_read(fd2, read_buf, 20); 
+    fs_close(fd2);
+    umount_fs("mydisk");
+
+    fs_create("test1.txt");
+
+    int fd = fs_open("test1.txt");
+
+    char test[] = "Hello, World!";
+    fs_write(fd, test, sizeof(test));
+
+    fs_close(fd);
+    umount_fs("mydisk");
+
+     fd = fs_open("test1.txt");
 
     return 0;
 }
