@@ -1,6 +1,6 @@
 Logical and Physical Directory
 
-![Logical and Physical Directory Diagram](labs/file-system-project4/physicallogicaldirs.png)
+![Logical and Physical Directory Diagram](physicallogicaldirs.png)
 
 The physical directory is what's stored on mydisk. It holds the File Allocation Table In blocks 1 and 2 and the data stored there stays there even after the program stops running. It also hold the root stores the name, size and where the file is in the FAT. Whereas on the logical directory (the RAM), gets data from disk for the program to use quickly and then the changed data gets loaded back to the disk. 
 
@@ -8,7 +8,7 @@ Logical and Physical Directory Contents
 
 The FAT is shared with all files in the file system and essentially, each file has a starting point in the table, and just follows the chain of where the next block is until it reaches –1 (EOF). 
 
-![Diagram](labs/file-system-project4/dircontents.png)
+![Diagram](dircontents.png)
 
 The root directory holds the name and size of the files. The first block is how the program knows where to start from in the FAT. 
 
@@ -53,11 +53,11 @@ fs_truncate(): goes to the FAT chain to the place you want to truncate to and ma
 
 Hexdumps
 Before:
-Boot: ![Boot](labs/file-system-project4/rootbefore.png)
+Boot: ![Boot](rootbefore.png)
 
-Root: ![Root](labs/file-system-project4/rootdirbefore.png)
+Root: ![Root](rootdirbefore.png)
 
-FAT: ![FAT](labs/file-system-project4/FATbefore.png)
+FAT: ![FAT](FATbefore.png)
 
 After:
-![FAT](labs/file-system-project4/after.png)
+![FAT](after.png)
