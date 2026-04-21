@@ -2,6 +2,7 @@
 #include "disk.h"
 #include <stdio.h>
 #include <sys/types.h>
+#include <pthread.h>
 
 #define FAT_SIZE 4096
 #define FAT_FREE -2
@@ -227,7 +228,7 @@ int fs_delete(char *name) {
     //free the blocks allocated to the file in fat
     int block_idx = root[root_idx].first_block_idx;
 
-    while (block_idx != -1) {
+    while (block_idx != -1 && block_idx != FAT_FREE) {
         int next_block_idx = fat[block_idx]; //get next block index from FAT
         fat[block_idx] = FAT_FREE; //mark  block as free
         block_idx = next_block_idx; 
@@ -470,31 +471,33 @@ int fs_get_filesize(int fildes) {
     //return file size from root directory
 }
 
-
+void *thread_ptr(void *arg) {
+    mount_fs("mydisk");
+    int fd = fs_open("test1.txt");
+    char read_buf[14];
+    fs_read(fd, read_buf, 14);
+    printf("%s\n", read_buf);
+    fs_close(fd);
+    fs_delete("test1.txt");
+    umount_fs("mydisk");
+    return NULL;
+}
 
 int main() {
-    
-    
     make_fs("mydisk");
     mount_fs("mydisk");
-
-    int fd2 = fs_open("nonexistent.txt");
-    char read_buf[20];
-    fs_read(fd2, read_buf, 20); 
-    fs_close(fd2);
-    umount_fs("mydisk");
-
     fs_create("test1.txt");
 
     int fd = fs_open("test1.txt");
-
     char test[] = "Hello, World!";
     fs_write(fd, test, sizeof(test));
-
     fs_close(fd);
+
     umount_fs("mydisk");
 
-     fd = fs_open("test1.txt");
+    pthread_t thread;
+    pthread_create(&thread, NULL, thread_ptr, NULL);
+    pthread_join(thread, NULL);
 
     return 0;
 }
